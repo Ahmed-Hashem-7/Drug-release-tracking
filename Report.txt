@@ -1,0 +1,375 @@
+\documentclass[9pt,twocolumn]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{times}
+
+\begin{document}
+
+% Creating title and author section
+\title{Numerical and Machine Learning Solutions for Drug Release Tracking in Biomedical Engineering}
+\author{Mohamed Elsayed Abdelaziz, Ahmed Hashem Ahmed, Ahmed Wael Shenif, Abdullah Mohamed Khalifa,\\ Ahmed Salah Geyoushi, Mohamed Hamdy Abdelhameed, Ahmed Ahmed Mokhtar, Osama Magdy Ali \\ \small Under Supervision of Dr. Mohamed Rushdi}
+\date{}
+\maketitle
+
+% Writing abstract
+\begin{abstract}
+This paper explores numerical and machine learning approaches to model drug release from polymer matrices, a critical challenge in biomedical engineering. The radial diffusion equation is solved using both the Crank-Nicolson and Runge-Kutta 4 (RK4) methods, alongside a Physics-Informed Neural Network (PINN). We present an in-depth analysis comparing accuracy, computational efficiency, and robustness. Additional sections introduce biological rationale, modeling assumptions, and interpretation of results. Finally, pragmatic recommendations and future directions are discussed.
+
+\textbf{Index Terms}---Drug release; radial diffusion; Crank-Nicolson; Runge-Kutta; Physics-Informed Neural Network; biomedical engineering.
+\end{abstract}
+
+% Starting Introduction section
+\section{Introduction}
+Ensuring optimal drug release kinetics in biomedical implants and polymer-based delivery systems is vital to maximizing therapeutic effectiveness while minimizing side effects. Controlled release systems rely on accurately modeling and predicting how drug molecules diffuse through polymer matrices and into surrounding tissues. Traditional methods, although robust, often fail to scale efficiently for complex geometries or variable boundary conditions.
+The motivation for this work stems from the need for computational frameworks that can adapt to real-world experimental settings-where domain irregularities, anisotropic media, and heterogeneous materials are common. By comparing conventional numerical solvers with machine learning-based approaches, we aim to chart a path toward more flexible, data-informed drug delivery simulations that can scale to clinical applications.
+
+% Starting Literature Review section
+\section{Literature Review}
+A wealth of research has investigated finite difference and finite element methods for diffusion-based PDEs. Schiesser's foundational work \cite{schiesser} demonstrates efficient coarse-grid solutions for drug release problems and highlights their convergence properties. However, these methods can run into stability issues when time steps or mesh sizes become too coarse.
+On the data-driven front, Physics-Informed Neural Networks (PINNs) have received considerable attention. Raissi et al. \cite{raissi} framed PINNs as universal PDE solvers, embedding governing equations into neural loss functions. Subsequent works, such as Yang et al. \cite{yang}, demonstrated practical applications of PINNs in drug delivery modeling, including irregular shapes and process noise. Karniadakis et al. \cite{karniadakis} critically analyzed PINNs' strengths-mesh-free training, generalizability-as well as their limitations, including high computational cost and poor scaling to high-dimensional problems.
+Our comparative approach aligns with hybrid modeling trends: numerical accuracy complemented by data-driven flexibility.
+
+% Starting Governing Equations section
+\section{Governing Equations and Assumptions}
+The radial diffusion equation in cylindrical coordinates, under radial symmetry and negligible convection, governs the evolution of species concentration $u_i(r, t)$:
+
+The diffusion equation in radial coordinates for each species $u(r,t)$ is:
+\[
+\frac{\partial u}{\partial t} = D \left( \frac{\partial^2 u}{\partial r^2} + \frac{1}{r} \frac{\partial u}{\partial r} \right) - k (u - u_e)
+\]
+\textbf{Assumptions:}
+\begin{enumerate}
+    \item \textit{Radial Symmetry}: The solution $u = u(r,t)$ depends only on the radial coordinate $r$, not on angular $\theta$ or axial $z$ directions. \textit{Implication}: The domain is spherically or cylindrically symmetric --- like a disk, sphere, or cylinder --- and the concentration is the same in all directions at a given radius.
+    \item \textit{1D Spatial Domain}: No gradients in the axial ($z$) or angular ($\theta$) directions. \textit{Implication}: Diffusion occurs only in the radial direction.
+    \item \textit{Constant Diffusion Coefficient $D$}: $D$ does not vary with space, time, or concentration. \textit{Implication}: Material properties are homogeneous and isotropic (uniform in all directions).
+    \item \textit{First-Order Reaction Term}: Drug or fluid degradation/loss is modeled as a linear sink term: $-k (u - u_e)$. \textit{Implication}: The rate of degradation is proportional to how far the current concentration is from equilibrium $u_e$.
+    \item \textit{Robin Boundary Condition at $r=R$}: A mixed boundary condition: $-D \frac{\partial u}{\partial r} = k (u - u_e)$. \textit{Implication}: Models partial flux across the boundary --- neither fully insulating (Neumann) nor fixed concentration (Dirichlet). Typical of semipermeable membranes or controlled drug release interfaces.
+    \item \textit{No Internal Sources}: No additional sources or sinks inside the domain (e.g., metabolism, injection). \textit{Implication}: All dynamics are due to diffusion and degradation.
+    \item \textit{Smooth and Differentiable Solution}: $u(r,t)$ is sufficiently smooth to allow the use of finite difference approximations. \textit{Implication}: Solution is continuous and behaves nicely --- no sharp jumps, singularities, or discontinuities.
+    \item \textit{Initial Conditions are Uniform}: At $t=0$, the concentration is uniform throughout the domain. \textit{Example}: $u_1(r,0) = 0.5$, $u_2(r,0) = 1.0$
+    \item \textit{Neglect of Convection}: No bulk fluid motion or flow. \textit{Implication}: Transport is only by diffusion, not advection or pressure-driven flow.
+    \item \textit{Dilute Solution (Linear Diffusion)}: Concentration is low enough for diffusion to obey Fick's laws (linear behavior). \textit{Implication}: No nonlinear diffusion effects like crowding or viscosity changes.
+\end{enumerate}
+
+% Starting Numerical Methods section
+\section{Numerical Methods}
+\subsection{Crank-Nicolson Scheme}
+The diffusion of water and drug components within a cylindrical system can be modeled using the radial diffusion equation derived from Fick's second law in cylindrical coordinates. Assuming symmetry in the angular and axial directions, the governing equation for a scalar concentration field $u(r,t)$ becomes:
+\[
+\frac{\partial u}{\partial t} = D \left( \frac{\partial^2 u}{\partial r^2} + \frac{1}{r} \frac{\partial u}{\partial r} \right) - k u
+\]
+where:
+\begin{itemize}
+    \item $u(r,t)$ is the concentration (either water or drug),
+    \item $D$ is the diffusion coefficient,
+    \item $k$ is a first-order loss (reaction or removal) rate,
+    \item $r$ is the radial spatial coordinate, and
+    \item $t$ is time.
+\end{itemize}
+This equation is solved numerically using the Crank-Nicolson method.
+
+\subsubsection{Discretization Approach}
+The spatial domain (radius) is discretized into equally spaced points with step size $\Delta r$, and the temporal domain is discretized into steps of size $\Delta t$. At each grid point $r_i$, the concentration is updated over time.
+
+Crank-Nicolson is an implicit finite difference method that combines the forward and backward time-centered schemes. The time derivative is approximated as:
+\[
+\frac{u_i^{n+1} - u_i^n}{\Delta t} \approx \frac{1}{2} (L u^n + L u^{n+1})
+\]
+Here, $L$ is the discrete spatial operator derived from the second derivative and the $\frac{1}{r} \frac{\partial u}{\partial r}$ term in cylindrical coordinates.
+
+\subsubsection{Matrix Formulation}
+This leads to the matrix system:
+\[
+M_1 \cdot u^{n+1} = M_2 \cdot u^n + \Delta t \cdot c
+\]
+where:
+\begin{itemize}
+    \item $M_1 = I - \frac{\Delta t}{2} L$,
+    \item $M_2 = I + \frac{\Delta t}{2} L$,
+    \item $c$ is a vector accounting for boundary conditions (e.g., external concentration),
+    \item $u^n$ and $u^{n+1}$ are concentration vectors at current and next time steps.
+\end{itemize}
+The solution at each time step is obtained by solving this linear system.
+
+\subsubsection{Boundary Conditions}
+At the center ($r=0$), symmetry is enforced using the condition $\frac{\partial u}{\partial r} = 0$.
+
+At the outer boundary ($r=r_{\text{max}}$), a Robin boundary condition is used to model diffusion into the external environment:
+\[
+D \frac{\partial u}{\partial r} = k (u_e - u)
+\]
+This is implemented via a ``ghost point'' method and incorporated into the spatial matrix and source vector $c$.
+
+\subsubsection{Initial Conditions}
+The concentrations of water ($u_1$) and drug ($u_2$) are initially uniform:
+\[
+u_1(r,0) = u_{10}, \quad u_2(r,0) = u_{20}
+\]
+These values are used to initialize the system at $t=0$.
+
+\subsubsection{Time Integration and Output}
+The Crank-Nicolson system is solved iteratively over all time steps. The results are stored and provide insight into how the water and drug components diffuse radially and how their profiles evolve due to both diffusion and boundary losses.
+
+\subsection{Runge-Kutta RK4}
+We are solving radial diffusion equations for two species: Water ($u_1$) and Drug ($u_2$), with radial symmetry in cylindrical or spherical coordinates and Robin boundary conditions.
+
+\subsubsection{Mathematical Equations}
+For each species $u(r,t)$, the diffusion equation in radial symmetry is:
+\[
+\frac{\partial u}{\partial t} = D \left( \frac{\partial^2 u}{\partial r^2} + \frac{1}{r} \frac{\partial u}{\partial r} \right) - k (u - u_e)
+\]
+Where:
+\begin{itemize}
+    \item $D$ is the diffusion coefficient,
+    \item $k$ is the degradation or surface loss rate,
+    \item $u_e$ is the equilibrium value at the boundary (for Robin BC).
+\end{itemize}
+These apply to both $u_1$ and $u_2$ with different $u_e$ values:
+\begin{itemize}
+    \item $u_{1e} = 1.0$ (Water equilibrium concentration),
+    \item $u_{2e} = 0.0$ (Drug assumed to vanish at surface).
+\end{itemize}
+
+\subsubsection{Boundary Conditions}
+At $r = 0$ (center): Symmetry $\Rightarrow$ $\frac{\partial u}{\partial r} = 0$.
+
+At $r = R$ (outer radius): Robin condition:
+\[
+-D \frac{\partial u}{\partial r} = k (u - u_e)
+\]
+
+\subsubsection{Initial Conditions}
+At $t = 0$:
+\[
+u_1(r,0) = 0.5, \quad u_2(r,0) = 1.0 \quad (\text{uniform initial conditions})
+\]
+
+\subsubsection{Numerical Method Flow Steps}
+\textbf{Step 1: Discretize Space and Time}
+
+Create grid points in space $r \in [0,1]$ with spacing $\Delta r$.
+
+Create time steps $t \in [0,48]$ with spacing $\Delta t$.
+
+\textbf{Step 2: Finite Difference Approximation}
+
+At each grid point $j$, use central differences:
+
+2nd derivative:
+\[
+\frac{\partial^2 u}{\partial r^2} \approx \frac{u_{j-1} - 2u_j + u_{j+1}}{\Delta r^2}
+\]
+
+1st derivative with radial symmetry:
+\[
+\frac{1}{r} \frac{\partial u}{\partial r} \approx \frac{u_{j+1} - u_{j-1}}{2 r_j \Delta r}
+\]
+These are implemented in the $RHS()$ function.
+
+\textbf{Step 3: Apply Boundary Conditions}
+
+At $r = 0$ (center): Use forward difference to approximate the symmetry:
+\[
+\frac{\partial^2 u}{\partial r^2} \approx \frac{2 (u_1 - u_0)}{\Delta r^2}
+\]
+
+At $r = R$ (edge): Use backward difference with Robin condition:
+\[
+\frac{\partial^2 u}{\partial r^2} \approx \frac{2 (u_{N-2} - u_{N-1})}{\Delta r^2} - \frac{2k}{D \Delta r} (u_{N-1} - u_e)
+\]
+
+\textbf{Step 4: Time Integration Using RK4}
+
+Runge-Kutta 4th Order method is used:
+\[
+k_1 = f(u^n)
+\]
+\[
+k_2 = f\left(u^n + \frac{1}{2} \Delta t \cdot k_1\right)
+\]
+\[
+k_3 = f\left(u^n + \frac{1}{2} \Delta t \cdot k_2\right)
+\]
+\[
+k_4 = f\left(u^n + \Delta t \cdot k_3\right)
+\]
+\[
+u^{n+1} = u^n + \frac{\Delta t}{6} (k_1 + 2k_2 + 2k_3 + k_4)
+\]
+This is implemented in the $RK4\_step()$ function.
+
+\textbf{Step 5: Time Loop}
+
+Loop from $t = 0$ to $t = 48$ hours.
+
+Update both $u_1$ and $u_2$ using $RK4\_step()$.
+
+Store results in $U1$ and $U2$ arrays for visualization.
+
+\textbf{Step 6: Plotting and Visualization}
+
+Generate 2D plots of $u_1$, $u_2$ vs. $r$ at selected times (12h, 24h, etc.).
+
+Generate 3D surface plots: $u_1(r,t)$ and $u_2(r,t)$.
+
+\clearpage
+
+% Starting Comparison section
+\section{Comparison}
+
+\small
+Error Using Radau Method at t = 48 hr\\
+\begin{tabular}{ccc}
+\toprule
+r & Error $u_1$ (\%) & Error $u_2$ (\%) \\
+\midrule
+0.00 & 0.0502 & 0.0493 \\
+0.10 & 0.0118 & 0.0381 \\
+0.20 & 0.0401 & 0.0836 \\
+0.30 & 0.0475 & 0.0592 \\
+0.40 & 0.0196 & 0.0843 \\
+0.50 & 0.0590 & 0.0034 \\
+0.60 & 0.0404 & 0.1126 \\
+0.70 & 0.0416 & 0.1264 \\
+0.80 & 0.0332 & 0.2903 \\
+0.90 & 0.0001 & 0.0037 \\
+1.00 & 0.0003 & N/A \\
+\bottomrule
+\end{tabular}
+
+
+
+\small
+ML (PINN) Errors\\
+\begin{tabular}{ccccccc}
+\toprule
+r & $u_1$ & true $u_1$ & \%Err $u_1$ & $u_2$ & true $u_2$ & \%Err $u_2$ \\
+\midrule
+0.000 & 0.827 & 0.761 & 8.64 & 0.346 & 0.479 & 27.67 \\
+0.100 & 0.829 & 0.764 & 8.53 & 0.342 & 0.472 & 27.60 \\
+0.200 & 0.836 & 0.774 & 8.04 & 0.328 & 0.453 & 27.69 \\
+0.300 & 0.848 & 0.790 & 7.31 & 0.304 & 0.421 & 27.67 \\
+0.400 & 0.863 & 0.811 & 6.45 & 0.273 & 0.378 & 27.69 \\
+0.500 & 0.882 & 0.838 & 5.30 & 0.235 & 0.325 & 27.63 \\
+0.600 & 0.904 & 0.868 & 4.17 & 0.192 & 0.265 & 27.71 \\
+0.700 & 0.928 & 0.900 & 3.10 & 0.144 & 0.199 & 27.54 \\
+0.800 & 0.952 & 0.934 & 1.98 & 0.095 & 0.131 & 27.42 \\
+0.900 & 0.977 & 0.968 & 0.91 & 0.046 & 0.064 & 27.63 \\
+1.000 & 1.000 & 1.000 & 0.00 & 0.000 & 0.000 & nan \\
+\bottomrule
+\end{tabular}
+
+\small
+Water Concentration ($u_1$) Errors, Crank-Nicolson\\
+\begin{tabular}{ccccc}
+\toprule
+r & True $u_1$ & Computed $u_1$ & Abs. Error & Rel. Error (\%) \\
+\midrule
+0.0 & 0.761 & 0.696 & 0.065 & 8.5414 \\
+0.1 & 0.764 & 0.704 & 0.060 & 7.8534 \\
+0.2 & 0.774 & 0.717 & 0.057 & 7.3643 \\
+0.3 & 0.790 & 0.737 & 0.053 & 6.7089 \\
+0.4 & 0.811 & 0.764 & 0.047 & 5.7953 \\
+0.5 & 0.838 & 0.796 & 0.042 & 5.0119 \\
+0.6 & 0.868 & 0.833 & 0.035 & 4.0323 \\
+0.7 & 0.900 & 0.873 & 0.027 & 3.0000 \\
+0.8 & 0.934 & 0.915 & 0.019 & 2.0343 \\
+0.9 & 0.968 & 0.956 & 0.012 & 1.2397 \\
+1.0 & 1.000 & 0.996 & 0.004 & 0.4000 \\
+\bottomrule
+\end{tabular}
+
+
+
+\small
+Drug Concentration ($u_2$) Errors, Crank-Nicolson\\
+\begin{tabular}{ccccc}
+\toprule
+r & True $u_2$ & Computed $u_2$ & Abs. Error & Rel. Error (\%) \\
+\midrule
+0.0 & 0.479 & 0.609 & 0.130 & 27.1399 \\
+0.1 & 0.472 & 0.592 & 0.120 & 25.4237 \\
+0.2 & 0.453 & 0.566 & 0.113 & 24.9444 \\
+0.3 & 0.421 & 0.526 & 0.105 & 24.9406 \\
+0.4 & 0.378 & 0.473 & 0.095 & 25.1323 \\
+0.5 & 0.325 & 0.408 & 0.083 & 25.5385 \\
+0.6 & 0.265 & 0.334 & 0.069 & 26.0377 \\
+0.7 & 0.199 & 0.254 & 0.055 & 27.6382 \\
+0.8 & 0.131 & 0.170 & 0.039 & 29.7710 \\
+0.9 & 0.064 & 0.087 & 0.023 & 35.9375 \\
+1.0 & 0.000 & 0.008 & 0.008 & N/A \\
+\bottomrule\\\\\\\\
+\end{tabular}
+
+
+
+\small
+Water Concentration ($u_1$) - Absolute Errors, Runge-Kutta RK4\\
+\begin{tabular}{ccccc}
+\toprule
+r & True $u_1$ & Computed $u_1$ & Abs. Error & Rel. Error (\%) \\
+\midrule
+0.0 & 0.761 & 0.70191 & 0.05909 & 7.7648 \\
+0.1 & 0.764 & 0.70622 & 0.05778 & 7.5628 \\
+0.2 & 0.774 & 0.71821 & 0.05579 & 7.2080 \\
+0.3 & 0.790 & 0.73769 & 0.05231 & 6.6215 \\
+0.4 & 0.811 & 0.76401 & 0.04699 & 5.7941 \\
+0.5 & 0.838 & 0.79623 & 0.04177 & 4.9844 \\
+0.6 & 0.868 & 0.83313 & 0.03487 & 4.0173 \\
+0.7 & 0.900 & 0.87326 & 0.02674 & 2.9711 \\
+0.8 & 0.934 & 0.91497 & 0.01903 & 2.0375 \\
+0.9 & 0.968 & 0.95652 & 0.01148 & 1.1859 \\
+1.0 & 1.000 & 0.99615 & 0.00385 & 0.3850 \\
+\bottomrule
+\end{tabular}
+
+
+
+\small
+Drug Concentration ($u_2$) - Absolute Errors, Runge-Kutta RK4\\
+\begin{tabular}{ccccc}
+\toprule
+r & True $u_2$ & Computed $u_2$ & Abs. Error & Rel. Error (\%) \\
+\midrule
+0.0 & 0.479 & 0.59618 & 0.11718 & 24.4635 \\
+0.1 & 0.472 & 0.58756 & 0.11556 & 24.4829 \\
+0.2 & 0.453 & 0.56358 & 0.11058 & 24.4106 \\
+0.3 & 0.421 & 0.52461 & 0.10361 & 24.6105 \\
+0.4 & 0.378 & 0.47198 & 0.09398 & 24.8624 \\
+0.5 & 0.325 & 0.40754 & 0.08254 & 25.3972 \\
+0.6 & 0.265 & 0.33374 & 0.06874 & 25.9396 \\
+0.7 & 0.199 & 0.25348 & 0.05448 & 27.3769 \\
+0.8 & 0.131 & 0.17006 & 0.03906 & 29.8168 \\
+0.9 & 0.064 & 0.08696 & 0.02296 & 35.8750 \\
+1.0 & 0.000 & 0.00770 & 0.00770 & N/A \\
+\bottomrule\\
+\end{tabular}
+
+
+Crank Nicolson: Crank-Nicolson Execution time: 0.88 seconds  
+Runge Kutta: RK4 Execution time: 3.77 seconds  
+Radau Execution time: 1.16 seconds  
+ML Execution time: 3.44 seconds  
+
+\textbf{Comparison of Error Metrics: Discussion}: Crank-Nicolson exhibits a maximum relative error of 8.54\% for $u_1$ and 27.14\% for $u_2$, with the worst error at $r = 0.0$ (center) and systematic underestimation. Runge-Kutta shows slightly better accuracy with a maximum relative error of 7.76\% for $u_1$ and 24.46\% for $u_2$, with the best error at $r = 1.0$ (boundary). Both methods show boundary violations at $r = 1.0$ for $u_2$ (0.008 for CN, 0.00770 for RK vs. 0.000 expected), suggesting potential issues with boundary implementation. Radau exhibits a maximum relative error of 0.59\% for $u_1$ and 29.03\% for $u_2$, with the best error at $r = 0.9$ for $u_1$ and $r = 0.5$ for $u_2$. ML (PINN) shows a maximum relative error of 8.64\% for $u_1$ and 27.71\% for $u_2$, with the best error at $r = 1.0$ for both. Crank-Nicolson's larger $\Delta t = 0.1$ hr contrasts with RK4's $\Delta t = 0.01$ hr, impacting computational efficiency.
+
+% Starting Future Directions section
+\section{Future Directions}
+Research directions include integrating PINNs with Crank-Nicolson for enhanced accuracy and efficiency, extending models to 2D and 3D domains with anisotropic diffusion coefficients, incorporating additional reaction terms to account for complex biochemical interactions, and enhancing PINN training with adaptive techniques to improve robustness and reduce sensitivity to hyperparameters.
+
+% Starting Conclusion section
+\section{Conclusion}
+This study contrasts Crank-Nicolson, RK4, and PINNs for drug diffusion modeling. Crank-Nicolson excels in speed and stability, RK4 in error control, and PINNs in flexibility. A hybrid approach may optimize accuracy and interpretability.
+
+% Adding references
+\begin{thebibliography}{9}
+\bibitem{schiesser} W. E. Schiesser, \emph{Partial Differential Equation Analysis in Biomedical Engineering}, Cambridge Univ. Press, 2013.
+\bibitem{raissi} M. Raissi, P. Perdikaris, and G. E. Karniadakis, ``Physics-informed neural networks,'' \emph{J. Comp. Phys.}, vol. 378, pp. 686--707, 2019.
+\bibitem{yang} L. Yang, X. Meng, and G. E. Karniadakis, ``Physics-informed neural networks for drug delivery systems,'' \emph{Comp. Methods Appl. Mech. Eng.}, vol. 385, p. 114052, 2021.
+\bibitem{karniadakis} G. E. Karniadakis et al., ``Physics-informed machine learning,'' \emph{Nat. Rev. Phys.}, vol. 3, pp. 422--440, 2021.
+\end{thebibliography}
+
+\end{document}
