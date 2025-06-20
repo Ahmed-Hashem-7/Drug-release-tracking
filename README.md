@@ -15,4 +15,4 @@
 
 You can view and run the code on **Google Colab** using the link below:
 
-🔗 [Open in Google Colab](https://colab.research.google.com/drive/1y46YG-LfV_em9tiysk1kH6TYGATh9Gc2?usp=sharing)
+🔗 [Open in Google Colab](https://colab.research.google.com/drive/1dL7y4Jc8l0hyrhPQ9oqBSECyDJQ8g7kB?usp=sharing)
